@@ -22,64 +22,73 @@ USAGE
 
 */
 
+#Got it!
+header('X-PHP-Response-Code: 200', true, 200);
 
 # Grab some of the values from the slash command, create vars for post back to Slack
-$command = $_POST['command'];
+#$command = $_POST['command'];
 $text = $_POST['text'];
-$token = $_POST['token'];
+$username = $_POST['user_name'];
+$userid = $_POST["user_id"];
+$channel_id = $_POST["channel_id"];
+$response_url = $_POST["response_url"];
 
-# Check the token and make sure the request is from our team 
-if($token != 'vnLfaOlI7natbpU5tKQBm5dQ'){ #replace this with the token from your slash command configuration page
-  $msg = "The token for the slash command doesn't match. Check your script.";
-  die($msg);
-  echo $msg;
+function slack($message, $channel, $userid, $username, $channel_id, $response_url)
+{
+    $ch = curl_init("https://slack.com/api/chat.postMessage");
+    $data = http_build_query([
+        "token" => "YEf22XTCjLOu3YEuuZ7BDRAm",
+    	"channel" => $channel, //"#mychannel",
+    	"text" => $message, //"Hello, Foo-Bar channel message.",
+    	"username" => "Barkeep",
+    	"attachments": [
+        {
+            "fallback": "You are unable to order a drink",
+            "callback_id": "barkeep",
+            "color": "#3AA3E3",
+            "attachment_type": "default",
+            "actions": [
+                {
+                    "name": "order",
+                    "text": "Acknowledge",
+                    "type": "button",
+                    "value": "okay"
+                },
+                {
+                    "name": "order",
+                    "text": "Deny",
+                    "style": "danger",
+                    "type": "button",
+                    "value": "nope",
+                    "confirm": {
+                        "title": "Are you sure?",
+                        "text": "This will delete the user's order.",
+                        "ok_text": "Yes",
+                        "dismiss_text": "No"
+                    }
+                },
+                {
+                    "name": "order",
+                    "text": "Drink is Ready",
+                    "type": "button",
+                    "value": "ready"
+                }
+            ]
+        }
+    ]
+    ]);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    $result = curl_exec($ch);
+    curl_close($ch);
+    
+    return $result;
 }
 
 
-# isitup.org doesn't require you to use API keys, but they do require that any automated script send in a user agent string.
-# You can keep this one, or update it to something that makes more sense for you
-$user_agent = "IsitupForSlack/1.0 (https://github.com/mccreath/istiupforslack; mccreath@gmail.com)";
+slack($username+" would like a "+$text+".","#bartender",$userid,$username,$channel_id,$response_url);
 
-# We're just taking the text exactly as it's typed by the user. If it's not a valid domain, isitup.org will respond with a `3`.
-# We want to get the JSON version back (you can also get plain text).
-$url_to_check = "https://isitup.org/".$text.".json";
+echo "Thanks; order submitted!";
 
-# Set up cURL 
-$ch = curl_init($url_to_check);
-
-# Set up options for cURL 
-# We want to get the value back from our query 
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-# Send in our user agent string 
-curl_setopt($ch, CURLOPT_USERAGENT, $user_agent);
-
-# Make the call and get the response 
-$ch_response = curl_exec($ch);
-# Close the connection 
-curl_close($ch);
-
-# Decode the JSON array sent back by isitup.org
-$response_array = json_decode($ch_response,true);
-
-# Build our response 
-# Note that we're using the text equivalent for an emoji at the start of each of the responses.
-# You can use any emoji that is available to your Slack team, including the custom ones.
-if($ch_response === FALSE){
-  # isitup.org could not be reached 
-  $reply = "Ironically, isitup could not be reached.";
-}else{
-  if($response_array["status_code"] == 1){
-  	# Yay, the domain is up! 
-    $reply = ":thumbsup: I am happy to report that *<http://".$response_array["domain"]."|".$response_array["domain"].">* is *up*!";
-  } else if($response_array["status_code"] == 2){
-    # Boo, the domain is down. 
-    $reply = ":disappointed: I am sorry to report that *<http://".$response_array["domain"]."|".$response_array["domain"].">* is *not up*!";
-  } else if($response_array["status_code"] == 3){
-    # Uh oh, isitup.org doesn't think the domain entered by the user is valid
-    $reply = ":interrobang: *".$text."* does not appear to be a valid domain. \n";
-    $reply .= "Please enter both the domain name AND suffix (example: *amazon.com* or *whitehouse.gov*).";
-  }
-}
-
-# Send the reply back to the user. 
-echo $reply;
