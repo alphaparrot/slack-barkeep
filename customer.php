@@ -88,7 +88,7 @@ function slack($message, $channel, $userid, $username, $channel_id, $response_ur
 }
 
 
-slack($username+" would like a "+$text+".","#bartender",$userid,$username,$channel_id,$response_url);
+slack($username." would like a ".$text.".","#bartender",$userid,$username,$channel_id,$response_url);
 
 echo "Thanks; order submitted!";
 
